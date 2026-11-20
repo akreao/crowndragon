@@ -172,6 +172,10 @@ struct Settings {
     bool own_camera = true;  // separate cameras online
     bool rumble = true;  // controller vibration (DCP_RUMBLE=0 off)
     bool confirm_circle = false;  // Japanese layout, Circle confirms / Cross cancels (DCP_CONFIRM=circle, hle/confirm_button.h)
+    // Single-player cheats (hle/cheats.h), never applied in an online room: DCP_CHEAT_GOD / _GOLD / _DAMAGE.
+    bool cheat_god = false, cheat_gold = false;
+    float cheat_damage = 1.0f;  // 1 = off
+    float cheat_xp = 1.0f;      // 1 = off (DCP_CHEAT_XP)
 };
 
 void load_settings(const std::string& path, Settings& s) {
@@ -203,6 +207,10 @@ void load_settings(const std::string& path, Settings& s) {
         else if (k == "own_camera") s.own_camera = v == "1" || v == "true";
         else if (k == "confirm") s.confirm_circle = v == "circle";
         else if (k == "rumble") s.rumble = v == "1" || v == "true";
+        else if (k == "cheat_god") s.cheat_god = v == "1" || v == "true";
+        else if (k == "cheat_gold") s.cheat_gold = v == "1" || v == "true";
+        else if (k == "cheat_damage") s.cheat_damage = std::clamp(std::strtof(v.c_str(), nullptr), 1.0f, 10.0f);
+        else if (k == "cheat_xp") s.cheat_xp = std::clamp(std::strtof(v.c_str(), nullptr), 1.0f, 10.0f);
     }
 }
 
@@ -220,6 +228,10 @@ void save_settings(const std::string& path, const Settings& s) {
       << "\nown_camera = " << (s.own_camera ? "true" : "false")
       << "\nconfirm = " << (s.confirm_circle ? "circle" : "cross")
       << "\nrumble = " << (s.rumble ? "true" : "false")
+      << "\ncheat_god = " << (s.cheat_god ? "true" : "false")
+      << "\ncheat_gold = " << (s.cheat_gold ? "true" : "false")
+      << "\ncheat_damage = " << s.cheat_damage
+      << "\ncheat_xp = " << s.cheat_xp
       << "\n";
 }
 
@@ -511,6 +523,14 @@ bool start_game(Game& g, const Settings& s, const std::string& user, const std::
     set_env("DCP_OWN_CAMERA", s.own_camera ? "" : "0");
     set_env("DCP_CONFIRM", s.confirm_circle ? "circle" : "");
     set_env("DCP_RUMBLE", s.rumble ? "" : "0");
+    set_env("DCP_CHEAT_GOD", s.cheat_god ? "1" : "");
+    set_env("DCP_CHEAT_GOLD", s.cheat_gold ? "1" : "");
+    char dmg[16];
+    std::snprintf(dmg, sizeof dmg, "%g", s.cheat_damage);
+    set_env("DCP_CHEAT_DAMAGE", s.cheat_damage > 1.0f ? dmg : "");
+    char xp[16];
+    std::snprintf(xp, sizeof xp, "%g", s.cheat_xp);
+    set_env("DCP_CHEAT_XP", s.cheat_xp > 1.0f ? xp : "");
 
     // stdin /dev/null, stdout + stderr to the log; nothing else inherited (no sockets of a friends / bug-report
     // session running at the time). Working dir = the launcher's folder, like on Windows.
@@ -1959,7 +1979,7 @@ int main(int argc, char** argv) {
                 int k = 0;
                 while (k < 7 && cycle[k] != page) ++k;
                 page = cycle[(k % 7 + (pad.pressed(Pad::R1) ? 1 : 6)) % 7];
-                if (page == 1 || page == 2) settings_tab = settings_select = page;  // the tab bar follows
+                if (page == 1 || page == 2 || page == 7) settings_tab = settings_select = page;  // the tab bar follows
                 nav_to_sidebar = true;
             }
             pad_play = pad.pressed(Pad::Start);
@@ -1983,12 +2003,12 @@ int main(int argc, char** argv) {
                                             ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus |
                                             ImGuiWindowFlags_NoBackground);
         // "Update" (6) is reached through the entry at the bottom of the sidebar, not the navigation list.
-        const char* names[] = {"Game", "Controls", "Display", "Online", "Save Folder", "Report a Bug", "Update"};
+        const char* names[] = {"Game", "Controls", "Display", "Online", "Save Folder", "Report a Bug", "Update", "Cheats"};
         constexpr int kSettings = -1;
         const int order[] = {0, 4, kSettings, 3, 5};
-        auto in_settings = [](int t) { return t == 1 || t == 2; };
+        auto in_settings = [](int t) { return t == 1 || t == 2 || t == 7; };
         if (first) {
-            for (int t = 0; t < 7; ++t)
+            for (int t = 0; t < 8; ++t)
                 if (strcasecmp(names[t], first_tab.c_str()) == 0) page = t;
             if (strcasecmp(first_tab.c_str(), "Settings") == 0) page = 2;
             if (in_settings(page)) settings_tab = page, settings_select = page;
@@ -2107,7 +2127,7 @@ int main(int argc, char** argv) {
             heading(font_head, in_settings(t) ? "Settings" : names[t]);
             if (in_settings(t)) {
                 if (ImGui::BeginTabBar("##settings")) {
-                    for (int s : {2, 1}) {  // Display, Controls
+                    for (int s : {2, 1, 7}) {  // Display, Controls, Cheats
                         if (ImGui::BeginTabItem(names[s], nullptr, settings_select == s ? ImGuiTabItemFlags_SetSelected : 0)) {
                             page = settings_tab = s;
                             ImGui::EndTabItem();
@@ -2363,6 +2383,28 @@ int main(int argc, char** argv) {
                 ImGui::SetNextItemWidth(160 * scale);
                 if (ImGui::Combo("##language", &lang, kLangNames, 5)) set.language = kLangIds[lang];
                 ImGui::TextColored(kDim, "Game text and menus; applies the next time the game starts.");
+            } else if (t == 7) {
+                ImGui::TextWrapped("Single-player only: cheats switch themselves off in online rooms, so other players "
+                                   "are never affected. They apply the next time the game starts.");
+                ImGui::Spacing();
+                ImGui::Checkbox("Infinite HP (enemy hits do no damage to you)", &set.cheat_god);
+                ImGui::Checkbox("Infinite gold (kept at 99,999,999)", &set.cheat_gold);
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Your hero's gold is saved with the rest of the save file; turning this off later keeps\n"
+                                      "whatever gold you had.");
+                ImGui::SetNextItemWidth(220 * scale);
+                ImGui::SliderFloat("Damage multiplier", &set.cheat_damage, 1.0f, 10.0f, set.cheat_damage > 1.0f ? "x%.1f" : "Off");
+                slider_active = slider_active || ImGui::IsItemActive();
+                slider_id = ImGui::GetItemID();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("Your hits on enemies. Floating damage numbers still show the normal amount.");
+                ImGui::SetNextItemWidth(220 * scale);
+                ImGui::SliderFloat("XP multiplier", &set.cheat_xp, 1.0f, 10.0f, set.cheat_xp > 1.0f ? "x%.1f" : "Off");
+                slider_active = slider_active || ImGui::IsItemActive();
+                slider_id = ImGui::GetItemID();
+                if (ImGui::IsItemHovered())
+                    ImGui::SetTooltip("XP counted on the results screen after a stage. Level-ups work as usual;\n"
+                                      "the XP tally just takes longer to count up.");
             } else if (t == 3) {
                 auto text_field = [](const char* id, std::string& v, size_t cap, float w) {
                     char buf[512];

@@ -29,6 +29,7 @@
 #include "hle/confirm_button.h"
 #include "hle/skip_offers.h"
 #include "hle/own_camera.h"
+#include "hle/cheats.h"
 #include "loader/cpu_compat.h"
 #include "loader/elf.h"
 #include "loader/hle.h"
@@ -437,6 +438,7 @@ int main(int argc, char** argv) {
         dcp::skip_offers::install(eb->img.base);  // story / tutorial skip questions for every new hero (skip_offers.h)
         dcp::confirm_button::install(eb->img.base);  // DCP_CONFIRM=circle: Japanese button layout (confirm_button.h)
         dcp::own_camera::install(eb->img.base);   // separate cameras online
+        dcp::cheats::install(eb->img.base);       // single-player cheats, off online (cheats.h)
 #ifndef DCP_HAVE_RENDER
         if (render) throw std::runtime_error("--render needs a build with -DDCP_RENDER=ON (the default)");
 #else
