@@ -105,6 +105,7 @@ target_include_directories(dcp_hle PUBLIC src)
 target_compile_options(dcp_hle PRIVATE -fno-exceptions)
 target_link_libraries(dcp_hle PUBLIC dcp_loader winmm freetype dcp_texwatch dcp_net)
 target_sources(dcp_hle PRIVATE src/hle/own_camera.cpp)
+target_sources(dcp_hle PRIVATE src/hle/cheats.cpp)
 
 # Optional viewer (SDL3 + OpenGL 3.3). Point DCP_SDL3_DIR at an SDL3 MinGW dev tree (x86_64-w64-mingw32); skipped if absent.
 set(DCP_SDL3_DIR "" CACHE PATH "SDL3 prefix (contains lib/cmake/SDL3)")

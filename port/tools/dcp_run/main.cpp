@@ -19,6 +19,7 @@
 #include "hle/ime.h"
 #include "hle/net_trace.h"
 #include "hle/own_camera.h"
+#include "hle/cheats.h"
 #include "hle/confirm_button.h"
 #include "hle/skip_offers.h"
 #include "loader/cpu_compat.h"
@@ -393,6 +394,7 @@ int main(int argc, char** argv) {
         dcp::confirm_button::install(eb->img.base);  // DCP_CONFIRM=circle: Japanese button layout (confirm_button.h)
         dcp::net_trace::install(eb->img.base);    // $DCP_NET_TRACE only: online session trace (net_trace.h)
         dcp::own_camera::install(eb->img.base);   // separate cameras online
+        dcp::cheats::install(eb->img.base);       // single-player cheats, off online (cheats.h)
 #ifndef DCP_HAVE_RENDER
         if (render) throw std::runtime_error("--render needs a build with SDL3 (DCP_SDL3_DIR)");
 #else
